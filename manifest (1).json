@@ -8,13 +8,13 @@
   "description": "Gerenciador de escalas com lógica de conflito inteligente.",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/silvalexandre/newEscalas/main/New.png",
+      "src": "https://github.com/silvalexandre/escalasPro/blob/main/New.png?raw=true",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://raw.githubusercontent.com/silvalexandre/newEscalas/main/New.png",
+      "src": "https://github.com/silvalexandre/escalasPro/blob/main/New.png?raw=true",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
