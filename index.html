@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Escalas 4.2</title>
+    
+    
+    <meta name="theme-color" content="#1f2937"/>
+    <script>
+        const manifest = {
+            "name": "Gerenciador de Escalas 4.2", "short_name": "Escalas 4.2", "start_url": ".",
+            "display": "standalone", "background_color": "#1f2937", "theme_color": "#1f2937",
+            "description": "Gerenciador de escalas com lógica de conflito inteligente.",
+            "icons": [{"src": "https://raw.githubusercontent.com/silvalexandre/newEscalas/main/New.png", "sizes": "192x192", "type": "image/png", "purpose": "any"}, {"src": "https://raw.githubusercontent.com/silvalexandre/newEscalas/main/New.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        .calendar-day {
+            transition: background-color 0.2s; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; height: 3.5rem; gap: 4px;
+        }
+        
+        /* --- ESTILOS DE CONFLITO ATUALIZADOS --- */
+        .calendar-day.conflict-red { 
+            background-color: #c0392b !important; /* Vermelho para Conflito Real */
+            color: white !important; 
+            border-radius: 12px;
+        }
+        .calendar-day.conflict-blue { 
+            background-color: #2980b9 !important; /* Azul para Dobra Válida (SD+SN) */
+            color: white !important; 
+            border-radius: 12px;
+        }
+        /* --- FIM DA ATUALIZAÇÃO --- */
+
+        .day-number { font-weight: 500; }
+        .icon-container { display: flex; gap: 4px; height: 10px; align-items: center; }
+        .shift-icon { width: 8px; height: 8px; box-sizing: border-box; }
+        .shift-icon.star { font-size: 14px; line-height: 1; width: auto; height: auto; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #2d3748; }
+        ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #718096; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+        <header class="p-6 border-b border-gray-700">
+            <h1 class="text-2xl md:text-3xl font-bold text-center text-white">Gerenciador de Escalas 4.2</h1>
+            <p class="text-center text-gray-400 mt-2">Diferenciação entre conflitos e dobras.</p>
+        </header>
+
+        <div class="p-6 bg-gray-800 space-y-4" id="jobs-container"></div>
+        <div class="px-6 pb-4">
+            <button id="add-job-btn" class="w-full bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                Adicionar Vínculo
+            </button>
+        </div>
+
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <button id="prev-month" class="p-2 rounded-full hover:bg-gray-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg></button>
+                <h2 id="month-year" class="text-xl font-semibold w-48 text-center"></h2>
+                <button id="next-month" class="p-2 rounded-full hover:bg-gray-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
+                <div>DOM</div><div>SEG</div><div>TER</div><div>QUA</div><div>QUI</div><div>SEX</div><div>SÁB</div>
+            </div>
+            <div id="calendar-days" class="grid grid-cols-7 gap-1"></div>
+        </div>
+
+        <div class="p-4 bg-gray-800 border-t border-gray-700">
+             <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mb-4">
+                <span class="flex items-center space-x-2"><div class="w-4 h-4 rounded-md" style="background-color: #c0392b;"></div><span class="text-sm text-gray-300">Conflito</span></span>
+                <span class="flex items-center space-x-2"><div class="w-4 h-4 rounded-md" style="background-color: #2980b9;"></div><span class="text-sm text-gray-300">Dobra (SD+SN)</span></span>
+                <span class="flex items-center space-x-2"><span class="text-yellow-400">⭐</span><span class="text-sm text-gray-300">Folga</span></span>
+             </div>
+            <div class="flex flex-col items-center space-y-3">
+                 <button id="stats-btn" class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Ver Estatísticas do Mês</button>
+                <button id="clear-month-btn" class="w-full max-w-xs bg-red-800 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Limpar Mês Atual</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 rounded-2xl shadow-lg w-full max-w-lg p-6">
+            <h3 id="modal-title" class="text-xl font-bold text-center mb-6"></h3>
+            <div id="modal-jobs-container" class="space-y-4 mb-6 max-h-[60vh] overflow-y-auto pr-2"></div>
+            <button data-action="close-modal" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4">Fechar</button>
+        </div>
+    </div>
+    <div id="pattern-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden"><div class="bg-gray-800 rounded-2xl shadow-lg w-full max-w-lg p-6"><h3 id="pattern-modal-title" class="text-xl font-bold text-center mb-6"></h3><div class="flex items-center justify-center space-x-2 mb-6"><label for="pattern-modal-length" class="text-white font-medium">Ciclo de:</label><input type="number" id="pattern-modal-length" value="2" min="1" max="31" class="w-16 bg-gray-700 text-white text-center font-bold py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"><span class="text-white font-medium">dias</span></div><div id="pattern-days-container" class="space-y-3 max-h-64 overflow-y-auto mb-6 pr-2"></div><div class="flex space-x-4"><button data-action="close-pattern-modal" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">Cancelar</button><button id="save-pattern-btn" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Salvar Padrão</button></div></div></div>
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden"><div class="bg-gray-800 rounded-2xl shadow-lg w-full max-w-sm p-6 text-center"><h3 class="text-xl font-bold mb-4">Você tem certeza?</h3><p id="confirm-modal-text" class="text-gray-300 mb-6"></p><div class="flex justify-center space-x-4"><button data-action="close-confirm-modal" class="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancelar</button><button id="confirm-action-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">Confirmar</button></div></div></div>
+    <div id="stats-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden"><div class="bg-gray-800 rounded-2xl shadow-lg w-full max-w-2xl p-6"><h3 id="stats-modal-title" class="text-xl font-bold text-center mb-6"></h3><div id="stats-content" class="space-y-4 mb-6 max-h-[60vh] overflow-y-auto pr-2"></div><button data-action="close-stats-modal" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4">Fechar</button></div></div>
+    <div id="toast" class="hidden fixed bottom-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg z-50 transition-opacity duration-300"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const MAX_JOBS = 6;
+        const COLOR_PALETTE = ['#3498db', '#2ecc71', '#e67e22', '#9b59b6', '#f1c40f', '#e74c3c'];
+        const SHIFT_HOURS = { 'SD': 12, 'SN': 12, '24H': 24, 'FOLGA': 0 };
+        
+        const DOMElements = { jobsContainer: document.getElementById('jobs-container'), monthYear: document.getElementById('month-year'), calendarDays: document.getElementById('calendar-days'), toast: document.getElementById('toast'), modals: { main: document.getElementById('modal'), title: document.getElementById('modal-title'), jobsContainer: document.getElementById('modal-jobs-container'), pattern: document.getElementById('pattern-modal'), patternTitle: document.getElementById('pattern-modal-title'), patternLengthInput: document.getElementById('pattern-modal-length'), patternDaysContainer: document.getElementById('pattern-days-container'), savePatternBtn: document.getElementById('save-pattern-btn'), confirm: document.getElementById('confirm-modal'), confirmText: document.getElementById('confirm-modal-text'), confirmActionBtn: document.getElementById('confirm-action-btn'), stats: document.getElementById('stats-modal'), statsTitle: document.getElementById('stats-modal-title'), statsContent: document.getElementById('stats-content') } };
+        let AppState = { jobs: [{ name: 'VÍNCULO 1', color: COLOR_PALETTE[0], pattern: [] }], shifts: {}, currentDate: new Date(), confirmCallback: null };
+
+        const saveData = () => localStorage.setItem('@shift_manager_v4.2:state', JSON.stringify({ jobs: AppState.jobs, shifts: AppState.shifts }));
+        const loadData = () => { const savedState = localStorage.getItem('@shift_manager_v4.2:state'); if (savedState) { const parsedState = JSON.parse(savedState); AppState.jobs = parsedState.jobs || [{ name: 'VÍNCULO 1', color: COLOR_PALETTE[0], pattern: [] }]; AppState.shifts = parsedState.shifts || {}; AppState.jobs.forEach((job, index) => { if (!job.color) job.color = COLOR_PALETTE[index % COLOR_PALETTE.length]; if (!job.pattern) job.pattern = []; }); } };
+        const renderJobInputs = () => { DOMElements.jobsContainer.innerHTML = ''; AppState.jobs.forEach((job, index) => { const div = document.createElement('div'); div.className = 'bg-gray-700 p-4 rounded-lg space-y-3'; div.innerHTML = ` <div class="flex items-center space-x-3"> <div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${job.color}"></div> <input type="text" value="${job.name}" data-action="update-job-name" data-index="${index}" class="w-full bg-gray-600 text-white placeholder-gray-400 border border-gray-500 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" style="text-transform: uppercase;" onfocus="this.select()"> <button data-action="remove-job" data-index="${index}" class="text-gray-400 hover:text-white transition-colors p-1 text-2xl leading-none">&times;</button> </div> <div class="flex space-x-3"> <button data-action="define-pattern" data-index="${index}" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg text-sm transition-colors">Definir Escala</button> <button data-action="autofill" data-index="${index}" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-3 rounded-lg text-sm transition-colors">Aplicar no Mês</button> </div>`; DOMElements.jobsContainer.appendChild(div); }); document.getElementById('add-job-btn').disabled = AppState.jobs.length >= MAX_JOBS; };
+        
+        // =================================================================
+        // ATUALIZAÇÃO PRINCIPAL NA FUNÇÃO renderCalendar
+        // =================================================================
+        const renderCalendar = () => {
+            DOMElements.calendarDays.innerHTML = '';
+            const month = AppState.currentDate.getMonth();
+            const year = AppState.currentDate.getFullYear();
+            DOMElements.monthYear.textContent = `${AppState.currentDate.toLocaleString('pt-BR', { month: 'long' })} de ${year}`;
+            
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDayOfMonth; i++) DOMElements.calendarDays.innerHTML += `<div></div>`;
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayShifts = AppState.shifts[dateStr] || [];
+                const activeShifts = dayShifts.filter(s => s.type !== 'FOLGA');
+                
+                // *** NOVA LÓGICA DE CONFLITO INTELIGENTE ***
+                let isTrueConflict = false;
+                let isNonConflictingOverlap = false;
+
+                if (activeShifts.length > 1) {
+                    const shiftTypes = activeShifts.map(s => s.type);
+                    // Condição para Dobra Válida (Azul): exatamente 1 SD e 1 SN
+                    if (shiftTypes.length === 2 && shiftTypes.includes('SD') && shiftTypes.includes('SN')) {
+                        isNonConflictingOverlap = true;
+                    } else {
+                        // Qualquer outra combinação é um Conflito Real (Vermelho)
+                        isTrueConflict = true;
+                    }
+                }
+                // *** FIM DA NOVA LÓGICA ***
+
+                const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+                
+                const dayEl = document.createElement('div');
+                let classList = 'calendar-day cursor-pointer hover:bg-gray-700 rounded-lg';
+                if (isTrueConflict) classList += ' conflict-red';
+                if (isNonConflictingOverlap) classList += ' conflict-blue';
+                if (isToday && !isTrueConflict && !isNonConflictingOverlap) classList += ' border-2 border-blue-500';
+
+                dayEl.className = classList;
+                dayEl.dataset.action = 'open-day-modal';
+                dayEl.dataset.date = dateStr;
+
+                let innerHTML = `<span class="day-number">${day}</span>`;
+                if (dayShifts.length > 0) {
+                    const iconContainer = document.createElement('div');
+                    iconContainer.className = 'icon-container';
+                    dayShifts.forEach(shiftObj => {
+                        const job = AppState.jobs.find(j => j.name === shiftObj.job);
+                        if (!job) return;
+                        const icon = document.createElement('div');
+                        icon.className = 'shift-icon';
+                        const color = job.color;
+                        switch (shiftObj.type) {
+                            case 'FOLGA': icon.className += ' star'; icon.textContent = '⭐'; icon.style.color = '#f1c40f'; break;
+                            case 'SD': icon.style.cssText = `background-color: ${color}; border-radius: 50%;`; break;
+                            case 'SN': icon.style.cssText = `background-color: transparent; border: 2px solid ${color}; border-radius: 50%;`; break;
+                            case '24H': icon.style.cssText = `background-color: ${color}; border-radius: 2px;`; break;
+                        }
+                        iconContainer.appendChild(icon);
+                    });
+                    innerHTML += iconContainer.outerHTML;
+                }
+                dayEl.innerHTML = innerHTML;
+                DOMElements.calendarDays.appendChild(dayEl);
+            }
+        };
+        
+        // O restante do JS não precisa de alterações e está incluído na íntegra.
+        const render = () => { renderJobInputs(); renderCalendar(); };
+        const openModal = (id) => document.getElementById(id).classList.remove('hidden');
+        const closeModal = (id) => document.getElementById(id).classList.add('hidden');
+        const openDayModal = (dateStr) => { const [year, month, day] = dateStr.split('-'); DOMElements.modals.title.textContent = `Plantões - ${day}/${month}/${year}`; DOMElements.modals.main.dataset.selectedDate = dateStr; DOMElements.modals.jobsContainer.innerHTML = ''; const currentShifts = AppState.shifts[dateStr] || []; AppState.jobs.forEach((job, index) => { const currentShiftForJob = currentShifts.find(s => s.job === job.name); const container = document.createElement('div'); container.className = 'bg-gray-700 p-3 rounded-lg'; container.innerHTML = ` <div class="flex items-center justify-between"> <div class="flex items-center space-x-3"><div class="w-4 h-4 rounded-full" style="background-color: ${job.color}"></div><span class="font-medium" style="text-transform: uppercase;">${job.name}</span></div> <div class="flex items-center space-x-1 sm:space-x-2"> ${Object.keys(SHIFT_HOURS).map(type => `<button data-action="set-shift" data-job-index="${index}" data-shift-type="${type}" class="px-2 sm:px-3 py-1 text-sm font-semibold rounded ${currentShiftForJob?.type === type ? 'bg-blue-600 text-white' : 'bg-gray-600 hover:bg-gray-500'}">${type === 'FOLGA' ? 'Folga' : type}</button>`).join('')} <button data-action="clear-shift" data-job-index="${index}" class="px-2 py-1 text-sm font-semibold rounded bg-red-800 hover:bg-red-700 text-white">X</button> </div> </div>`; DOMElements.modals.jobsContainer.appendChild(container); }); openModal('modal'); };
+        const openConfirmModal = (text, callback) => { DOMElements.modals.confirmText.textContent = text; AppState.confirmCallback = callback; openModal('confirm-modal'); };
+        const openPatternModal = (jobIndex) => { const job = AppState.jobs[jobIndex]; DOMElements.modals.patternTitle.textContent = `Definir Escala para ${job.name.toUpperCase()}`; DOMElements.modals.pattern.dataset.jobIndex = jobIndex; const patternLength = job.pattern?.length || 2; DOMElements.modals.patternLengthInput.value = patternLength; renderPatternDays(patternLength, job.pattern || []); openModal('pattern-modal'); };
+        const renderPatternDays = (length, pattern) => { DOMElements.modals.patternDaysContainer.innerHTML = ''; for (let i = 0; i < length; i++) { const dayPattern = pattern[i] || { type: 'FOLGA' }; const div = document.createElement('div'); div.className = 'flex items-center justify-between bg-gray-700 p-2 rounded-lg'; div.innerHTML = `<span class="font-medium text-white">Dia ${i + 1}</span><select data-day-index="${i}" class="pattern-day-select bg-gray-600 text-white rounded-md p-1 border-0 focus:outline-none focus:ring-2 focus:ring-teal-500">${Object.keys(SHIFT_HOURS).map(type => `<option value="${type}" ${dayPattern.type === type ? 'selected' : ''}>${type === 'FOLGA' ? 'Folga' : type}</option>`).join('')}</select>`; DOMElements.modals.patternDaysContainer.appendChild(div); } };
+        const openStatsModal = () => { const month = AppState.currentDate.getMonth(); const year = AppState.currentDate.getFullYear(); const monthName = AppState.currentDate.toLocaleString('pt-BR', { month: 'long' }); DOMElements.modals.statsTitle.textContent = `Estatísticas de ${monthName} de ${year}`; const stats = {}; AppState.jobs.forEach(job => { stats[job.name] = { totalHours: 0, shifts: {} }; Object.keys(SHIFT_HOURS).forEach(type => stats[job.name].shifts[type] = 0); }); for(const dateStr in AppState.shifts) { if (dateStr.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`)) { AppState.shifts[dateStr].forEach(shift => { if (stats[shift.job]) { stats[shift.job].shifts[shift.type]++; stats[shift.job].totalHours += (SHIFT_HOURS[shift.type] || 0); } }); } } DOMElements.modals.statsContent.innerHTML = AppState.jobs.map(job => { const jobStats = stats[job.name]; return `<div class="bg-gray-700 p-4 rounded-lg"><div class="flex items-center space-x-3 mb-3"><div class="w-4 h-4 rounded-full" style="background-color: ${job.color}"></div><h4 class="font-bold text-lg" style="text-transform: uppercase;">${job.name}</h4></div><div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center"><div><p class="text-xs text-gray-400">Plantões</p><p class="font-bold text-xl">${jobStats.shifts['SD']+jobStats.shifts['SN']+jobStats.shifts['24H']}</p></div><div><p class="text-xs text-gray-400">Folgas</p><p class="font-bold text-xl">${jobStats.shifts['FOLGA']}</p></div><div><p class="text-xs text-gray-400">Horas Trab.</p><p class="font-bold text-xl">${jobStats.totalHours}h</p></div></div></div>`; }).join('') || '<p class="text-center text-gray-400">Nenhuma escala registrada para este mês.</p>'; openModal('stats-modal'); };
+        const showToast = (message, isError = false) => { DOMElements.toast.textContent = message; DOMElements.toast.className = `fixed bottom-5 right-5 text-white py-2 px-4 rounded-lg shadow-lg z-50 transition-opacity duration-300 ${isError ? 'bg-red-600' : 'bg-green-600'}`; DOMElements.toast.classList.remove('hidden'); setTimeout(() => { DOMElements.toast.classList.add('hidden'); }, 3000); };
+        const Actions = { addJob: () => { if (AppState.jobs.length < MAX_JOBS) { const newJobName = `VÍNCULO ${AppState.jobs.length + 1}`; const newJobColor = COLOR_PALETTE[AppState.jobs.length % COLOR_PALETTE.length]; AppState.jobs.push({ name: newJobName, color: newJobColor, pattern: [] }); saveData(); render(); showToast("Novo vínculo adicionado!"); } }, removeJob: (index) => { const jobToRemove = AppState.jobs[index]; openConfirmModal(`Isso removerá "${jobToRemove.name}" e todas as suas escalas associadas. Deseja continuar?`, () => { const removedJobName = AppState.jobs[index].name; AppState.jobs.splice(index, 1); Object.keys(AppState.shifts).forEach(date => { AppState.shifts[date] = AppState.shifts[date].filter(s => s.job !== removedJobName); if (AppState.shifts[date].length === 0) delete AppState.shifts[date]; }); saveData(); render(); closeModal('confirm-modal'); showToast(`Vínculo "${removedJobName}" removido.`); }); }, updateJobName: (index, newName) => { const oldName = AppState.jobs[index].name; const upperNewName = newName.toUpperCase(); if (upperNewName && upperNewName !== oldName) { AppState.jobs[index].name = upperNewName; Object.keys(AppState.shifts).forEach(date => { (AppState.shifts[date] || []).forEach(shiftObj => { if (shiftObj.job === oldName) shiftObj.job = upperNewName; }); }); saveData(); render(); } else { render(); } }, setShift: (jobIndex, shiftType) => { const jobName = AppState.jobs[jobIndex].name; const selectedDate = DOMElements.modals.main.dataset.selectedDate; let dayShifts = AppState.shifts[selectedDate] || []; const existingShiftIndex = dayShifts.findIndex(s => s.job === jobName); if (existingShiftIndex > -1) { dayShifts[existingShiftIndex].type = shiftType; } else { dayShifts.push({ job: jobName, type: shiftType }); } AppState.shifts[selectedDate] = dayShifts; saveData(); render(); openDayModal(selectedDate); }, clearShift: (jobIndex) => { const jobName = AppState.jobs[jobIndex].name; const selectedDate = DOMElements.modals.main.dataset.selectedDate; let dayShifts = AppState.shifts[selectedDate] || []; dayShifts = dayShifts.filter(s => s.job !== jobName); if (dayShifts.length > 0) AppState.shifts[selectedDate] = dayShifts; else delete AppState.shifts[selectedDate]; saveData(); render(); openDayModal(selectedDate); }, clearMonth: () => { openConfirmModal(`Esta ação apagará todos os plantões do mês de ${AppState.currentDate.toLocaleString('pt-BR', { month: 'long' })}. Deseja continuar?`, () => { const year = AppState.currentDate.getFullYear(); const month = AppState.currentDate.getMonth() + 1; const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`; for (const dateStr in AppState.shifts) { if (dateStr.startsWith(monthPrefix)) delete AppState.shifts[dateStr]; } saveData(); render(); closeModal('confirm-modal'); showToast("Plantões do mês atual foram apagados."); }); }, savePattern: () => { const jobIndex = parseInt(DOMElements.modals.pattern.dataset.jobIndex, 10); const newPattern = []; const selects = DOMElements.modals.patternDaysContainer.querySelectorAll('.pattern-day-select'); selects.forEach(select => newPattern.push({ type: select.value })); AppState.jobs[jobIndex].pattern = newPattern; saveData(); closeModal('pattern-modal'); showToast(`Padrão de escala para ${AppState.jobs[jobIndex].name} salvo!`); }, autofill: (jobIndex) => { const job = AppState.jobs[jobIndex]; if (!job.pattern || job.pattern.length === 0) { showToast(`Nenhum padrão definido para ${job.name}. Clique em "Definir Escala" primeiro.`, true); return; } const year = AppState.currentDate.getFullYear(); const month = AppState.currentDate.getMonth(); const daysInMonth = new Date(year, month + 1, 0).getDate(); for (let day = 1; day <= daysInMonth; day++) { const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; const patternIndex = (day - 1) % job.pattern.length; const patternData = job.pattern[patternIndex]; let dayShifts = AppState.shifts[dateStr] || []; dayShifts = dayShifts.filter(s => s.job !== job.name); dayShifts.push({ job: job.name, type: patternData.type }); AppState.shifts[dateStr] = dayShifts; } saveData(); render(); showToast(`Escala de ${job.name} aplicada para o mês!`); } };
+        document.body.addEventListener('click', (e) => { const target = e.target.closest('[data-action]'); if (!target) return; const { action, index, date, jobIndex, shiftType } = target.dataset; switch(action) { case 'open-day-modal': openDayModal(date); break; case 'set-shift': Actions.setShift(parseInt(jobIndex, 10), shiftType); break; case 'clear-shift': Actions.clearShift(parseInt(jobIndex, 10)); break; case 'remove-job': Actions.removeJob(parseInt(index, 10)); break; case 'define-pattern': openPatternModal(parseInt(index, 10)); break; case 'autofill': Actions.autofill(parseInt(index, 10)); break; case 'close-modal': closeModal('modal'); break; case 'close-pattern-modal': closeModal('pattern-modal'); break; case 'close-confirm-modal': closeModal('confirm-modal'); break; case 'close-stats-modal': closeModal('stats-modal'); break; } });
+        document.getElementById('add-job-btn').addEventListener('click', Actions.addJob);
+        document.getElementById('clear-month-btn').addEventListener('click', Actions.clearMonth);
+        document.getElementById('stats-btn').addEventListener('click', openStatsModal);
+        DOMElements.modals.confirmActionBtn.addEventListener('click', () => { if (AppState.confirmCallback) AppState.confirmCallback(); });
+        DOMElements.jobsContainer.addEventListener('change', (e) => { if (e.target.dataset.action === 'update-job-name') { const index = parseInt(e.target.dataset.index, 10); const newName = e.target.value.trim(); Actions.updateJobName(index, newName); } });
+        DOMElements.modals.savePatternBtn.addEventListener('click', Actions.savePattern);
+        DOMElements.modals.patternLengthInput.addEventListener('change', (e) => { const length = parseInt(e.target.value, 10); const jobIndex = parseInt(DOMElements.modals.pattern.dataset.jobIndex, 10); if (!isNaN(length) && length > 0 && length <= 31) { renderPatternDays(length, AppState.jobs[jobIndex].pattern || []); } });
+        document.getElementById('prev-month').addEventListener('click', () => { AppState.currentDate.setMonth(AppState.currentDate.getMonth() - 1); render(); });
+        document.getElementById('next-month').addEventListener('click', () => { AppState.currentDate.setMonth(AppState.currentDate.getMonth() + 1); render(); });
+        loadData();
+        render();
+    });
+    </script>
+    <script>
+        if(typeof navigator.serviceWorker !== 'undefined'){
+
+            navigator.serviceWorker.register('pwabuider-sw.js')
+
+        }
+    </script>
+</body>
+</html>
